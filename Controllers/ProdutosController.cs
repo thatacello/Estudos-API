@@ -1,8 +1,13 @@
+using System.Net;
+using System.Runtime.ExceptionServices;
 using System;
 using System.Linq;
 using Estudos_API.Data;
 using Estudos_API.Models;
 using Microsoft.AspNetCore.Mvc;
+using Estudos_API.Hateoas;
+using System.Collections.Generic;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Estudos_API.Controllers
 {
@@ -10,12 +15,24 @@ namespace Estudos_API.Controllers
     // posso criar outras versões e a v1 continuar existindo
     // versão legada - versão sem suporte
     [ApiController]
+    [Authorize(Roles = "Admin")] // só permite entrar em produtos quem estiver autorizado
     public class ProdutosController : ControllerBase // controller voltado para API, não possui html ou views
     {
         private readonly ApplicationDbContext database;
+        private Hateoas.Hateoas Hateoas;
         public ProdutosController(ApplicationDbContext database)
         {
             this.database = database;
+            Hateoas = new Hateoas.Hateoas("localhost:5001/api/v1/produtos");
+            Hateoas.AddAction("GET_INFO", "GET");
+            Hateoas.AddAction("DELETE_PRODUCT", "DELETE");
+            Hateoas.AddAction("EDIT_PRODUCT", "PATCH");
+        }
+        [HttpGet("teste")]
+        public IActionResult TesteClaims()
+        {
+            // StringComparison.InvariantCultureIgnoreCase -> compara duas string ignorando letras maiusculas, minusculas, etc
+            return Ok(HttpContext.User.Claims.First(claim => claim.Type.ToString().Equals("id", StringComparison.InvariantCultureIgnoreCase)).Value);
         }
         [HttpGet]
         public IActionResult Get()
@@ -24,6 +41,14 @@ namespace Estudos_API.Controllers
 
             // retorna um Json
             var produtos = database.Produtos.ToList();
+            List<ProdutoContainer> produtosHateoas = new List<ProdutoContainer>();
+            foreach(var prod in produtos)
+            {
+                ProdutoContainer produtoHateoas = new ProdutoContainer();
+                produtoHateoas.produto = prod;
+                produtoHateoas.links = Hateoas.GetActions(prod.Id.ToString());
+                produtosHateoas.Add(produtoHateoas);
+            }
             return Ok(produtos);
             // return Ok(new { nome = "Thais Cardoso", signo = "capricórnio"});
         }
@@ -33,7 +58,10 @@ namespace Estudos_API.Controllers
             try
             {
                 Produto produto = database.Produtos.First(p => p.Id == id);
-                return Ok("Produto encontrado: " + produto);
+                ProdutoContainer produtoHateoas = new ProdutoContainer();
+                produtoHateoas.produto = produto;
+                produtoHateoas.links = Hateoas.GetActions(produto.Id.ToString());
+                return Ok(produtoHateoas);
             }
             catch(Exception)
             {
@@ -131,6 +159,11 @@ namespace Estudos_API.Controllers
         public class ProdutoTemp{
             public string Nome { get; set; }
             public float Preco { get; set; }
+        }
+        public class ProdutoContainer
+        {
+            public Produto produto;
+            public Link[] links;
         }
     }
 }

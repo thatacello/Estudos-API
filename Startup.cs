@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Estudos_API.Data;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
@@ -12,6 +14,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Estudos_API
 {
@@ -34,6 +37,24 @@ namespace Estudos_API
             services.AddSwaggerGen(config => {
                 config.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo{ Title = "Estudo de API", Version = "v1" });
             });
+
+            string chaveDeSeguranca = "a_thais_eh_uma_guerreira_sayajin!";
+            var chaveSimetrica = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(chaveDeSeguranca));
+
+            // diz para o sistema que será usada essa forma de autenticação
+            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options => {
+
+                // como o sistema deve ler o token
+                options.TokenValidationParameters = new TokenValidationParameters{
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateIssuerSigningKey = true,
+                    // dados de validação de um jwt
+                    ValidIssuer = "thaismarket.com",
+                    ValidAudience = "usuario_comum",
+                    IssuerSigningKey = chaveSimetrica
+                };
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -45,6 +66,8 @@ namespace Estudos_API
             }
 
             app.UseHttpsRedirection();
+
+            app.UseAuthentication(); // aplica o sistema de autenticação na aplicação
 
             app.UseRouting();
 
